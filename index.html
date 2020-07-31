@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Blasteroids</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+	<audio id="audiotag1" src="./sounds/fire.ogg" preload="auto"></audio>
+    <style>
+      body {
+        background: #000;
+        color: #FF0000;
+        font-family: monospace;
+      }
+      #container {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 600px;
+        height: 600px;
+        margin: -300px 0 0 -300px;
+        box-shadow: 0 0 0 2px rgba(0, 255, 0, .3),
+                    0 0 20px 0 rgba(0, 255, 0, .5);
+      }
+      #copy {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        text-align: center;
+        font-size: 14px;
+        padding: 5px 0;
+      }
+      #copy a {
+        color: inherit;
+        font-style: italic;
+        text-decoration: none;
+        padding: 0 4px;
+        background: rgba(255, 255, 255, .1);
+      }
+      #copy a:hover {
+        background: rgba(255, 255, 255, .8);
+        color: #000;
+      }
+      #sound {
+        position: absolute;
+        bottom: 0;
+        left: 50%;
+        width: 160px;
+        margin-left: -80px;
+        margin-bottom: 40px;
+        text-align: center;
+      }
+        #sound label {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 4px 10px;
+          background: rgba(255, 255, 255, .1);
+          border-radius: 4px;
+        }
+        #sound input {
+          margin-right: 5px;
+        }
+    </style>
+  </head>
+  <body>
+    <div id="container"></div>
+    <div id="sound">
+      <label for="sound-enabled">
+        <input type="checkbox" id="sound-enabled" name="sound-enabled" />
+        Enable Sounds
+      </label>
+    </div>
+    <div id="copy">This game was made for <a href="http://www.fracturedspace.com/" target="_blank">Fractured Space</a> (<a href="http://www.edgecasegames.net/" target="_blank">Edge Case Games</a>) by <a href="http://evyatar.amitay.me/" target="_blank">Evyatar Amitay</a></div>
+
+    <script src="blasteroids.js"></script>
+    <script>
+      var elSound = document.querySelector('#sound-enabled');
+
+      window.AudioPlayer = {
+        'sounds': {},
+
+        'Blasteroids_Fire': {
+          'src': 'fire.ogg',
+          'volume': 0.07,
+          'lastPlayed': 0,
+          'limitPlays': 0.1
+        },
+        'Blasteroids_HitAsteroid': {
+          'src': 'asteroidHit.ogg',
+          'volume': 0.07,
+          'lastPlayed': 0,
+          'limitPlays': 0.2
+        },
+        'Blasteroids_Die': {
+          'src': 'die.ogg',
+          'volume': 0.5,
+          'lastPlayed': 0,
+          'limitPlays': 0
+        },
+        'Blasteroids_PowerupCollected': {
+          'src': 'powerup.ogg',
+          'volume': 0.3,
+          'lastPlayed': 0,
+          'limitPlays': 0
+        },
+        'Blasteroids_PowerupSpawned': {
+          'src': 'powerupSpawn.ogg',
+          'volume': 0.2,
+          'lastPlayed': 0,
+          'limitPlays': 0
+        },
+        'Blasteroids_StartMoving': {
+          'src': 'engines.ogg',
+          'volume': 0,
+          'loop': true,
+          'lastPlayed': 0,
+          'limitPlays': 0
+        },
+        'Blasteroids_StopMoving': {
+          'stop': 'Blasteroids_StartMoving'
+        },
+
+        'load': function load(sound) {
+          if (!sound.src) {
+            return;
+          }
+
+          if (!this.context) {
+            this.context = new (window.AudioContext || window.webkitAudioContext)();
+          }
+
+          var request = new XMLHttpRequest();
+          request.open('GET', 'sounds/' + sound.src, true);
+          request.responseType = 'arraybuffer';
+
+          request.onload = function onLoadSound() {
+            this.context.decodeAudioData(request.response, function(buffer) {
+              sound.buffer = buffer;
+            });
+          }.bind(this);
+          request.onerror = function onErrorSound() {
+            sound.error = true;
+          }.bind(this);
+
+          request.send();
+        },
+
+        'play': function play(sound) {
+          if (!sound || sound.error) {
+            return;
+          }
+
+          if(!elSound.checked) {
+            return;
+          }
+
+          if (!this.context) {
+            this.context = new (window.AudioContext || window.webkitAudioContext)();
+          }
+
+          if (sound.stop) {
+            var soundToStop = this[sound.stop];
+            if (soundToStop && soundToStop.audio) {
+              soundToStop.audio.pause();
+            }
+          }
+
+          if (sound.src) {
+            if (!sound.gain) {
+              sound.gain = this.context.createGain();
+              sound.gain.connect(this.context.destination);
+              sound.gain.gain.value = sound.volume;
+            }
+
+            if (!sound.buffer) {
+              this.load(sound);
+              return;
+            }
+
+            var now = Date.now();
+
+            if (!sound.limitPlays || (now - sound.lastPlayed)/1000 > sound.limitPlays) {
+              
+			  var source = this.context.createBufferSource();
+              source.buffer = sound.buffer;
+              source.connect(sound.gain);
+              source.start(0);
+
+              /*
+              var audio = new Audio();
+              audio.volume = sound.volume;
+              audio.src = 'sounds/' + sound.src;
+              audio.loop = Boolean(sound.loop);
+              audio.play();
+              sound.audio = audio;
+              */
+
+              sound.lastPlayed = now;
+            }
+          }
+        }
+      };
+
+      AudioPlayer.load(AudioPlayer.Blasteroids_Fire);
+      AudioPlayer.load(AudioPlayer.Blasteroids_HitAsteroid);
+      AudioPlayer.load(AudioPlayer.Blasteroids_Die);
+      AudioPlayer.load(AudioPlayer.Blasteroids_PowerupCollected);
+      AudioPlayer.load(AudioPlayer.Blasteroids_PowerupSpawned);
+      AudioPlayer.load(AudioPlayer.Blasteroids_StartMoving);
+
+      elSound.addEventListener('change', function onChange(e) {
+        localStorage.sound = this.checked.toString();
+      });
+
+      try {
+        elSound.checked = localStorage.sound === 'true';
+      } catch(ex) {}
+
+      var game = new Blasteroids({
+        'el': document.querySelector('#container')
+      });
+
+      game.show();
+    </script>
+  </body>
+</html>
